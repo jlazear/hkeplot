@@ -231,6 +231,7 @@ class PlotPanel(wx.Panel):
         formats = ('.png', '.pdf', '.eps')
         self.choFigFormat = wx.Choice(self, wx.ID_ANY,
                                       choices=formats)
+        self.choFigFormat.SetSelection(0)
         bsFigName.Add(self.txtFigName, 1, wx.EXPAND)
         bsFigName.Add(self.choFigFormat, 0, wx.EXPAND)
         self.chkSameAsTitle = wx.CheckBox(self, wx.ID_ANY,
@@ -291,6 +292,7 @@ class PlotPanel(wx.Panel):
             return
 
         self.lboxFile.InsertItems(dfnames, 0)
+        self.Refresh()
 
     def onFileSelect(self, event):
         model = self.fmf.model
@@ -430,6 +432,9 @@ class PlotPanel(wx.Panel):
         checked = event.IsChecked()
         if checked:
             loc = self.choLegend.GetSelection()
+            if loc == 0:
+                loc = 1
+                self.choLegend.SetSelection(loc)
             self.plotter.legend(loc=loc)
         else:
             self.plotter.hide_legend()

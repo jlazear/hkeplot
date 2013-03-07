@@ -51,7 +51,7 @@ class MainFrame(wx.Frame):
         self.notebook = NotebookFrame(self.panel)
 
         self.bsMain = wx.BoxSizer(wx.VERTICAL)
-        self.bsMain.Add(self.notebook, 1, wx.ALL|wx.EXPAND)
+        self.bsMain.Add(self.notebook, 1, wx.ALL | wx.EXPAND)
 
         self.panel.SetSizer(self.bsMain)
 
