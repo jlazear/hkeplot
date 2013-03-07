@@ -31,7 +31,7 @@ class GraphFrame(wx.Frame):
         self.panel.SetSizer(self.bs2)
         self.bs2.Fit(self)
 
-    def create_plot_box(self, parent, plotsize=(3., 3.), data=None,
+    def create_plot_box(self, parent, plotsize=(6., 4.), data=None,
                         tb=True, figure=None):
         """
         Creates the panel containing the graph.
@@ -73,8 +73,8 @@ class GraphFrame(wx.Frame):
 
         return bsPlot, canvas, toolbar
 
-    def init_plot(self, plotsize=(3., 3.), data=None):
-        fig = Figure((3., 3.), dpi=100)
+    def init_plot(self, plotsize=(6., 4.), data=None):
+        fig = Figure(plotsize, dpi=100)
 
         axes = fig.add_subplot(111)
 

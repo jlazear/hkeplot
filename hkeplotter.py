@@ -9,6 +9,7 @@ import matplotlib
 matplotlib.use('WXAgg')
 import matplotlib.pyplot as plt
 
+
 class HKEPlotter(object):
     """
     A class for creating and serving up the figure objects associated
@@ -128,6 +129,8 @@ class HKEPlotter(object):
         if Tcline:
             self.addTcline(line, Tc)
 
+        return linedict
+
     def _get_linedict(self, line):
         """
         Finds and returns the line dictionary in self.lines that
@@ -144,12 +147,16 @@ class HKEPlotter(object):
         except NameError:
             raise HKEPlotterLineDoesNotExistError(line)
 
-    def addTcline(self, line, temperature):
+    def addTcline(self, line, temperature=None):
         """
         Add a vertical line corresponding to line at the specified
         temperature.
         """
+        self._checkfigure()
         ld = self._get_linedict(line)
+        line = ld['line']
+        if temperature is None:
+            temperature = ld['Tc']
         color = line.get_c()
         axvl = self.axes.axvline(temperature, color=color, ls='--')
         # self.axvlines.append(axvl)
@@ -159,6 +166,7 @@ class HKEPlotter(object):
         """
         Remove a vertical line corresponding to line.
         """
+        self._checkfigure()
         ld = self._get_linedict(line)
         for vline in ld['vlines']:
             vline.remove()
@@ -168,6 +176,7 @@ class HKEPlotter(object):
         """
         Highlight a line by making its linewidth slightly larger.
         """
+        self._checkfigure()
         ld = self._get_linedict(line)
         ld['highlighted'] = True
         ld['highlight factor'] = factor
@@ -178,6 +187,7 @@ class HKEPlotter(object):
         Remove the highlighting of a line by restoring its linewidth
         to the original size.
         """
+        self._checkfigure()
         ld = self._get_linedict(line)
         ld['highlighted'] = False
         self.update_lines()
@@ -186,6 +196,7 @@ class HKEPlotter(object):
         """
         Remove a line and all lines related to it from the figure.
         """
+        self._checkfigure()
         ld = self._get_linedict(line)
         self.delTcline(ld)
         line = ld['line']
@@ -197,6 +208,7 @@ class HKEPlotter(object):
         Update all of the properties of the lines to match those
         specified by the lines dictionaries.
         """
+        self._checkfigure()
         for ld in self.lines:
             line = ld['line']
 
@@ -219,6 +231,78 @@ class HKEPlotter(object):
                 hline.set_linestyle('--')
                 hline.set_linewidth(lw)
 
+    def xscale(self, newscale, linthreshx=1.e-4):
+        """
+        Change the scale of the x axis.
+        """
+        self._checkfigure()
+        if newscale == 'symlog':
+            self.axes.set_xscale(newscale, linthreshx=linthreshx)
+        else:
+            self.axes.set_xscale(newscale)
+
+    def yscale(self, newscale, linthreshy=1.e-4):
+        """
+        Change the scale of the y axis.
+        """
+        self._checkfigure()
+        if newscale == 'symlog':
+            self.axes.set_yscale(newscale, linthreshy=linthreshy)
+        else:
+            self.axes.set_yscale(newscale)
+
+    def autorange(self):
+        """
+        Automatically adjusts the range of the x and y axes to fit the
+        data.
+        """
+        self._checkfigure()
+        self.axes.autoscale_view(True)
+
+    def legend(self, loc=None):
+        """
+        Create a legend.
+        """
+        self._checkfigure()
+        self.axes.legend(loc=loc)
+
+    def hide_legend(self):
+        """
+        Hide the legend.
+        """
+        self._checkfigure()
+        leg = self.axes.get_legend()
+        if leg:
+            leg.set_visible(False)
+
+    def title(self, title):
+        """
+        Set the title.
+        """
+        self._checkfigure()
+        self.axes.set_title(title)
+
+    def xlabel(self, xlabel):
+        """
+        Set the x label.
+        """
+        self._checkfigure()
+        self.axes.set_xlabel(xlabel)
+
+    def ylabel(self, ylabel):
+        """
+        Set the y label.
+        """
+        self._checkfigure()
+        self.axes.set_ylabel(ylabel)
+
+    def savefig(self, filename, dpi=300):
+        """
+        Save a figure to disk with the specified filename.
+        """
+        self._checkfigure()
+        self.figure.savefig(filename, dpi=dpi)
+
     def draw(self):
         """
         Show and redraw the figure. Generally not useful if HKEPlotter
@@ -234,6 +318,7 @@ class HKEPlotterError(Exception):
     A base class for HKEPlotter exceptions.
     """
     pass
+
 
 class HKEPlotterNotInitializedError(HKEPlotterError):
     """
