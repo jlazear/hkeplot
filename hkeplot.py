@@ -5,8 +5,6 @@ from plotpanel import PlotPanel
 from hkeplotter import HKEPlotter as Plotter
 from hkeplotmodel import HKEModel as Model
 
-import numpy as np
-
 
 class NotebookFrame(wx.Notebook):
     """
@@ -72,7 +70,7 @@ class MainFrame(wx.Frame):
 
         self.SetMenuBar(self.menuBar)
 
-        self.Bind(wx.EVT_MENU, self.onClose, self.mFile)
+        self.Bind(wx.EVT_MENU, self.onClose, id=wx.ID_EXIT)
 
     def add_model(self, model):
         self.model = model
@@ -86,6 +84,8 @@ class MainFrame(wx.Frame):
     def onClose(self, event):
         self.graphframe.Close()
         self.Close()
+        event.Skip()
+        wx.Exit()
 
 
 class GraphApp(wx.App):
