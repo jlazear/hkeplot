@@ -21,6 +21,7 @@ class NotebookFrame(wx.Notebook):
         self.AddPage(self.modelpanel, "Data files")
         self.AddPage(self.plotpanel, "Plot")
         self.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGING, self.onPageChanging)
+        self.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self.onPageChanging)
 
     def onPageChanging(self, event):
         new = event.GetSelection()
@@ -63,13 +64,15 @@ class MainFrame(wx.Frame):
         self.menuBar = wx.MenuBar()
         self.menus = []
 
-        mFile = wx.Menu()
-        mFile.Append(wx.ID_EXIT, '&Quit', 'Quit')
-        self.menus.append(mFile)
+        self.mFile = wx.Menu()
+        self.mFile.Append(wx.ID_EXIT, '&Quit', 'Quit')
+        self.menus.append(self.mFile)
 
-        self.menuBar.Append(mFile, "&File")
+        self.menuBar.Append(self.mFile, "&File")
 
         self.SetMenuBar(self.menuBar)
+
+        self.Bind(wx.EVT_MENU, self.onClose, self.mFile)
 
     def add_model(self, model):
         self.model = model
@@ -79,6 +82,10 @@ class MainFrame(wx.Frame):
 
     def add_graphframe(self, graphframe):
         self.graphframe = graphframe
+
+    def onClose(self, event):
+        self.graphframe.Close()
+        self.Close()
 
 
 class GraphApp(wx.App):
