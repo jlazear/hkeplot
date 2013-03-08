@@ -9,6 +9,7 @@ from matplotlib.backends.backend_wxagg import \
     FigureCanvasWxAgg as FigCanvas, \
     NavigationToolbar2WxAgg as NavigationToolbar
 
+
 class GraphFrame(wx.Frame):
     """
     The plot frame

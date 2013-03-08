@@ -5,8 +5,6 @@ from plotpanel import PlotPanel
 from hkeplotter import HKEPlotter as Plotter
 from hkeplotmodel import HKEModel as Model
 
-import numpy as np
-
 
 class NotebookFrame(wx.Notebook):
     """
