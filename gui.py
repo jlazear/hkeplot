@@ -1,10 +1,10 @@
 # import matplotlib
 # matplotlib.use('WXAgg')
 
-from hkeplotter import *
-from hkeplot import *
+from lib.hkeplot import GraphApp
+# from hkeplot import GraphApp
 
-calfolder = u'/Users/jlazear/Documents/HDD Documents/Misc Data/Cal Curves/'
+#calfolder = u'/Users/jlazear/Documents/HDD Documents/Misc Data/Cal Curves/'
 
 # model = Model()
 # #model.loadfile('hke_20130206_004.dat', calfolder + 'U03273.txt')
