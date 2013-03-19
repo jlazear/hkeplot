@@ -1,5 +1,11 @@
 hkeplot program for plotting HKE binary files.
 
+Run with
+
+python gui.py
+
+or use the Win7 binary, hkeplot.exe.
+
 jlazear
 jlazear@gmail.com
-2/28/13
+3/19/13

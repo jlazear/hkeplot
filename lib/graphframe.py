@@ -103,7 +103,8 @@ class GraphFrame(wx.Frame):
         if oldsizer is None:
             oldsizer = self.bs2
 
-        oldsizer.Remove(0)
+        self.cPlot.Destroy()
+        self.tbPlot.Destroy()
 
         bsPlot, cPlot, tbPlot = self.create_plot_box(self.panel,
                                                      figure=newfigure)
@@ -113,4 +114,6 @@ class GraphFrame(wx.Frame):
         self.tbPlot = tbPlot
 
         oldsizer.Add(bsPlot, 1, wx.EXPAND)
+        oldsizer.Remove(0)
+
         oldsizer.Layout()
