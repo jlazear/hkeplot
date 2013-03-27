@@ -4,6 +4,7 @@ The Model Panel for the HKE Plotter program's main panel.
 import wx
 import wx.lib.filebrowsebutton as wxfbb
 import wx.lib.agw.ultimatelistctrl as ulc
+from hkeplotmodel import HKEPlotError
 
 
 class ModelPanel(wx.Panel):
@@ -96,7 +97,16 @@ class ModelPanel(wx.Panel):
         model = self.fmf.model
         fname = self.fbbFileBrowser.GetValue()
         calfname = self.fbbCalFileBrowser.GetValue()
-        model.loadfile(fname, calfname)
+        try:
+            model.loadfile(fname, calfname, handleerrors=False)
+        except HKEPlotError as e:
+            errtxt = str(e)
+            dlg = wx.MessageDialog(self, errtxt,
+                                   "Failed to load file",
+                                   (wx.OK | wx.ICON_INFORMATION))
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
 
         # Update the listctrl with the newly added data file
         name = model.keys()[-1]

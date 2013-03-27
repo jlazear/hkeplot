@@ -67,7 +67,8 @@ class HKEModel(object):
                     raise ex
 
     def loadfile(self, hkefname, calfname,
-                 description='No description', dewar='SHINY'):
+                 description='No description', dewar='SHINY',
+                 handleerrors=True):
         dewar = dewar.lower()
         try:
             name = os.path.basename(hkefname)
@@ -82,6 +83,8 @@ class HKEModel(object):
                 fname=hkefname)
         except IOError:
             print "The file {fn} does not exist.".format(fn=hkefname)
+            if not handleerrors:
+                raise HKEPlotLoadError(hkefname, calfname)
             return
         except KeyError:
             # If the SHINY load fails, try the CRAAC load.
@@ -308,3 +311,23 @@ class HKEModel(object):
         tp = '<HKEModel object containing the data files: \
 {}>'.format(keys)
         return tp
+
+
+class HKEPlotError(Exception):
+    """
+    Generic error for hkeplot.
+    """
+    pass
+
+
+class HKEPlotLoadError(HKEPlotError):
+    """
+    An error indicating an error with loading a file.
+    """
+    def __init__(self, fname, calfname):
+        self.msg = ("Failed to load data.\n\n" +
+                    "Data file: {0}\n\n".format(fname) +
+                    "Cal file: {0}".format(calfname))
+
+    def __str__(self):
+        return self.msg

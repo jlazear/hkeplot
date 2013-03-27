@@ -1,4 +1,8 @@
+import matplotlib
+matplotlib.interactive(False)
+matplotlib.use('WXAgg')
 import wx
+import wx.lib.mixins.inspection #DELME
 from graphframe import GraphFrame
 from modelpanel import ModelPanel
 from plotpanel import PlotPanel
@@ -56,6 +60,8 @@ class MainFrame(wx.Frame):
 
         self.Layout()
 
+        self.Bind(wx.EVT_CLOSE, self.onClose, self)
+
     def make_menubar(self):
 
         ## WHY DOESN'T THIS WORK? ## #DELME
@@ -63,14 +69,14 @@ class MainFrame(wx.Frame):
         self.menus = []
 
         self.mFile = wx.Menu()
-        self.mFile.Append(wx.ID_EXIT, '&Quit', 'Quit')
+        self.miQuit = self.mFile.Append(wx.ID_EXIT, '&Quit', 'Quit')
         self.menus.append(self.mFile)
 
         self.menuBar.Append(self.mFile, "&File")
 
         self.SetMenuBar(self.menuBar)
 
-        self.Bind(wx.EVT_MENU, self.onClose, id=wx.ID_EXIT)
+        self.Bind(wx.EVT_MENU, self.onClose, self.miQuit)
 
     def add_model(self, model):
         self.model = model
@@ -80,32 +86,39 @@ class MainFrame(wx.Frame):
 
     def add_graphframe(self, graphframe):
         self.graphframe = graphframe
+        self.notebook.plotpanel.graphframe = graphframe
 
     def onClose(self, event):
-        self.graphframe.Close()
-        self.Close()
-        event.Skip()
-        wx.Exit()
+        self.graphframe.Destroy()
+        self.Destroy()
 
 
 class GraphApp(wx.App):
     def OnInit(self):
-        # Make the model and plotter
+        # Make the model and plotter, but do not initialize
         self.model = Model()
         self.plotter = Plotter(self.model)
-        self.plotter.makefigure()
-        self.plotter.add_subplot(111)
+
+        # Make the MainFrame and GraphFrame
+        fMainFrame = MainFrame(model=self.model,
+                               plotter=self.plotter)
+        fMainFrame.Show()
+        self.SetTopWindow(fMainFrame)
+        self.fMainFrame = fMainFrame
 
         fGraphFrame = GraphFrame()
-        # self.SetTopWindow(fGraphFrame)
         fGraphFrame.Show()
         self.fGraphFrame = fGraphFrame
 
-        fMainFrame = MainFrame(graphframe=self.fGraphFrame,
-                               model=self.model,
-                               plotter=self.plotter)
-        fMainFrame.Show()
-        self.fMainFrame = fMainFrame
+        # Attach the GraphFrame to the MainFrame
+        fMainFrame.add_graphframe(self.fGraphFrame)
+
+        # Initialize plotter figure
+        # Note this must be done after GraphFrame is created, since it
+        # has a tendency to create a frame of its own if none exists.
+        self.plotter.makefigure()
+        self.plotter.add_subplot(111)
+
         return 1
 
 if __name__ == '__main__':

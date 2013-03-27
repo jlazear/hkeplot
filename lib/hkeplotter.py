@@ -3,9 +3,10 @@ The HKEPlotter class is meant to create and serve up figures and plots
 of the data contained in an HKEModel model object.
 """
 
-import matplotlib
-matplotlib.use('WXAgg')
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.axes import Subplot, Axes
+import matplotlib as mpl
 
 
 class HKEPlotter(object):
@@ -26,15 +27,15 @@ class HKEPlotter(object):
         self.lines = []
         self.axvlines = []
         self.axhlines = []
-        self.cc = plt.rcParams['axes.color_cycle']
+        self.cc = mpl.rcParams['axes.color_cycle']
         self.usedcc = []
 
     def makefigure(self, figsize=(4., 4.), dpi=100, **kwargs):
-        self.figure = plt.figure(figsize=figsize, dpi=dpi, **kwargs)
+        self.figure = Figure(figsize=figsize, dpi=dpi, **kwargs)
         return self.figure
 
     def add_subplot(self, *args, **kwargs):
-        if type(self.figure) is not plt.Figure:
+        if type(self.figure) is not Figure:
             print "Figure not yet initialized. Make the figure first."
             return
 
@@ -49,6 +50,12 @@ class HKEPlotter(object):
         for c in self.cc:
             if c not in self.usedcc:
                 return c
+
+        # Only gets here if all colors already used...
+        i = len(self.axes.lines)
+        numc = len(self.cc)
+        i = i % numc
+        return self.cc[i]
 
     def plot(self, *args, **kwargs):
         color = self.getnextcolor()
@@ -83,8 +90,8 @@ class HKEPlotter(object):
         sufficiently. Raises a HKEPlotterNotInitializedError if this
         check fails.
         """
-        if ((type(self.figure) is plt.Figure) and
-            (type(self.axes) in (plt.Subplot, plt.Axes))):
+        if ((type(self.figure) is Figure) and
+            (type(self.axes) in (Subplot, Axes))):
             return
         else:
             raise HKEPlotterNotInitializedError(self.figure,
@@ -330,9 +337,9 @@ class HKEPlotterNotInitializedError(HKEPlotterError):
         figflag = False
         axesflag = False
 
-        if type(self.fig) is not plt.Figure:
+        if type(self.fig) is not Figure:
             figflag = True
-        if type(self.axes) not in (plt.Subplot, plt.Axes):
+        if type(self.axes) not in (Subplot, Axes):
             axesflag = True
 
         if figflag and axesflag:

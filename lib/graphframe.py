@@ -17,7 +17,11 @@ class GraphFrame(wx.Frame):
     title = 'HKE Plot'
 
     def __init__(self):
-        wx.Frame.__init__(self, None, -1, self.title)
+        styles = (wx.RESIZE_BORDER | wx.MINIMIZE_BOX)
+        # wx.Frame.__init__(self, wx.GetApp().TopWindow, wx.ID_ANY,
+        #                   title=self.title, style=styles)
+        wx.Frame.__init__(self, None, wx.ID_ANY,
+                          title=self.title, style=styles)
 
         self.panel = wx.Panel(self)
         bsPlot, cPlot, tbPlot = self.create_plot_box(self.panel)
@@ -31,6 +35,8 @@ class GraphFrame(wx.Frame):
 
         self.panel.SetSizer(self.bs2)
         self.bs2.Fit(self)
+
+        self.Bind(wx.EVT_CLOSE, self.onClose, self)
 
     def create_plot_box(self, parent, plotsize=(6., 4.), data=None,
                         tb=True, figure=None):
@@ -114,3 +120,6 @@ class GraphFrame(wx.Frame):
 
         oldsizer.Add(bsPlot, 1, wx.EXPAND)
         oldsizer.Layout()
+
+    def onClose(self, event):
+        pass

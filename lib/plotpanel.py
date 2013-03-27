@@ -365,6 +365,7 @@ class PlotPanel(wx.Panel):
         """
         When you press the plot button...
         """
+        # Get info about the model
         model = self.fmf.model
         name = self.lboxFile.GetStringSelection()
         register = self.lboxKey.GetStringSelection()
@@ -382,6 +383,7 @@ class PlotPanel(wx.Panel):
         except IndexError:
             return
 
+        # Set figure parameters (e.g. axis labels)
         xlabel = 'Temperature (K)'
         self.plotter.xlabel(xlabel)
         self.txtXlabel.ChangeValue(xlabel)
@@ -394,6 +396,7 @@ class PlotPanel(wx.Panel):
             self.plotter.ylabel(ylabel)
             self.txtYlabel.ChangeValue(ylabel)
 
+        # Get and plot selection
         indices = self.lboxIndices.GetSelections()
         tcflag = self.cbTcs.GetValue()
 
@@ -403,9 +406,16 @@ class PlotPanel(wx.Panel):
             linedict = self.plotter.RvsTPlot(df, register, i,
                                              Tcline=tcflag,
                                              description=filedesc)
+
+            description = ''
+            if filedesc:
+                description = ' - ' + filedesc
+            if d:
+                description = description + ' - ' + d
+
             # n = self.lctrlLines.GetItemCount()
             row = [register, name, dewar,
-                   'Ch {i} - {d}'.format(i=i, d=d)]
+                   'Ch {i}{d}'.format(i=i, d=description)]
             self.lctrlLines.Append(row)
             self.lctrlLines.linelist.append(linedict)
         self.lctrlLines.adjustColumnSizes()
