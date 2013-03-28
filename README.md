@@ -7,9 +7,9 @@ Run with
 
     python gui.py
 
-or use the Win7 binary, hkeplot.exe,
+or use the Win7 binary, `hkeplot.exe`,
 
-or use the OS X binary, hkeplot.app.
+or use the OS X binary, `hkeplot.app`.
 
 Author
 ======
