@@ -5,7 +5,7 @@ Usage
 
 Run with
 
-python gui.py
+    python gui.py
 
 or use the Win7 binary, hkeplot.exe,
 
@@ -15,5 +15,7 @@ Author
 ======
 
 jlazear
+
 jlazear@gmail.com
+
 2013-03-28
