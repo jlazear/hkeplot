@@ -2,7 +2,6 @@ import matplotlib
 matplotlib.interactive(False)
 matplotlib.use('WXAgg')
 import wx
-import wx.lib.mixins.inspection #DELME
 from graphframe import GraphFrame
 from modelpanel import ModelPanel
 from plotpanel import PlotPanel
