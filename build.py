@@ -26,6 +26,7 @@ elif sys.platform == 'darwin':
         "rm -r dist build",
         "rm setup.py"]
 
+
 for command in commands:
     try:
         print subprocess.check_output(command, shell=True)
