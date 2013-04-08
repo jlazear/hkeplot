@@ -12,6 +12,7 @@ Example usage:
 """
 
 from HKEBinaryFile import HKEBinaryFile as BinaryFile
+from HKEBinaryFile import HKEInvalidRegisterError
 from scipy.interpolate import interp1d
 from numpy import *
 import os
@@ -86,7 +87,7 @@ class HKEModel(object):
             if not handleerrors:
                 raise HKEPlotLoadError(hkefname, calfname)
             return
-        except KeyError:
+        except (KeyError, HKEInvalidRegisterError):
             # If the SHINY load fails, try the CRAAC load.
             print "SHINY load failed... Trying CRAAC load."
             name = os.path.basename(hkefname)
