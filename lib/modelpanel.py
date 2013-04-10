@@ -182,7 +182,10 @@ class HKEListCtrl(ulc.UltimateListCtrl):
         self.miRename = self.mContextMenu.Append(wx.ID_ANY, 'Rename')
         self.miChangeDesc = self.mContextMenu.Append(wx.ID_ANY,
                                            'Change Description')
-        self.miDelete = self.mContextMenu.Append(wx.ID_ANY, 'Delete Item')
+        self.miDelete = self.mContextMenu.Append(wx.ID_ANY,
+                                                 'Delete Item')
+        self.miChangeRegisters = self.mContextMenu.Append(wx.ID_ANY,
+                                             'Change Registers')
 
         # self.Bind(ulc.EVT_LIST_COL_RIGHT_CLICK, self.onContextMenu,
         #           self)
@@ -192,6 +195,8 @@ class HKEListCtrl(ulc.UltimateListCtrl):
         self.Bind(wx.EVT_MENU, self.onChangeDesc, self.miChangeDesc)
         self.Bind(wx.EVT_MENU, self.onDelete, self.miDelete)
         self.Bind(wx.EVT_MENU, self.onListChs, self.miListChs)
+        self.Bind(wx.EVT_MENU, self.onChangeReg,
+                  self.miChangeRegisters)
 
     def onContextMenu(self, event):
         self.PopupMenu(self.mContextMenu)
@@ -267,6 +272,28 @@ class HKEListCtrl(ulc.UltimateListCtrl):
             for i, txtlist in enumerate(dlg.txtlists):
                 ds = [txt.GetLineText(0) for txt in txtlist]
                 model.add_descriptions(name, ds, i+1)
+
+        dlg.Destroy()
+
+    def onChangeReg(self, event):
+        selected = self.GetFirstSelected()
+        name = self.GetItem(selected, 0).GetText()
+        model = self.fmf.model
+
+        dlg = RegistersDialog(self, wx.ID_ANY, name, model,
+                              title='Source Registers')
+
+        dlg.CenterOnScreen()
+        val = dlg.ShowModal()
+
+        if val == wx.ID_OK:
+            treg = dlg.chTemp.GetString(dlg.chTemp.GetSelection())
+            tch = int(dlg.chTchannel.GetString(dlg.chTchannel.GetSelection()))
+            s1reg = dlg.chSide1.GetString(dlg.chSide1.GetSelection())
+            s2reg = dlg.chSide2.GetString(dlg.chSide2.GetSelection())
+
+            model.change_sources(name, treg=treg, tch=tch,
+                                 s1reg=s1reg, s2reg=s2reg)
 
         dlg.Destroy()
 
@@ -367,3 +394,108 @@ class ChannelsDialog(wx.Dialog):
             bsChList.Add(bs, 0, wx.EXPAND)
 
         return bsChList, txtList
+
+
+class RegistersDialog(wx.Dialog):
+    def __init__(self, parent, id, dataname, model, **kwargs):
+        wx.Dialog.__init__(self, parent, id,
+                           style=(wx.DEFAULT_DIALOG_STYLE |
+                           wx.RESIZE_BORDER),
+                           **kwargs)
+
+        self.model = model
+        self.dataname = dataname
+        self.dewar = self.model[dataname]['dewar']
+        self.f = self.model[self.dataname]['file']
+        self.registers = self.f.list_registers()
+
+        self.bsMain = wx.BoxSizer(wx.VERTICAL)
+
+        self.lblTitle = wx.StaticText(self, wx.ID_ANY,
+                                      "Select source registers for:"
+                                      " {dfname}".format(dfname=dataname))
+
+        self.bsMain.Add(self.lblTitle, 0, wx.EXPAND)
+        self.bsMain.Add(wx.StaticLine(self, wx.ID_ANY), 0, wx.EXPAND)
+        self.bsMain.Add((5, 5))
+
+        self.bsTemp, self.chTemp = self.make_dropdown('Temperature')
+        self.bsSide1, self.chSide1 = self.make_dropdown('Side 1')
+        if self.dewar == 'craac':
+            tdefault = self.registers.index('ADR Root coil (1-DSPID):'
+                                            ' Demod')
+            s1default = self.registers.index('4W Quadrant'
+                                             ' (4-TRead_LR): Demod')
+            self.chTemp.SetSelection(tdefault)
+            self.chSide1.SetSelection(s1default)
+        elif self.dewar == 'shiny':
+            self.bsSide2, self.chSide2 = self.make_dropdown('Side 2')
+
+            tdefault = self.registers.index(
+                'SHINY_T4 (5-TRead_Standard): Demod')
+            s1default = self.registers.index(
+                'SHINY_T3 (8-TRead_LR): Demod')
+            s2default = self.registers.index(
+                'SHINY_T1 (4-TRead_LR): Demod')
+            self.chTemp.SetSelection(tdefault)
+            self.chSide1.SetSelection(s1default)
+            self.chSide2.SetSelection(s2default)
+
+        self.bsTchannel = wx.BoxSizer(wx.HORIZONTAL)
+        lbl = wx.StaticText(self, wx.ID_ANY, 'Temp Channel')
+        self.chTchannel = wx.Choice(self, wx.ID_ANY, choices=['0'])
+        self.update_tchannel()
+        self.bsTchannel.Add(lbl, 0, wx.EXPAND)
+        self.bsTchannel.Add(self.chTchannel, 1, wx.EXPAND)
+
+        self.bsMain.Add(self.bsTemp, 1, wx.EXPAND)
+        self.bsMain.Add(self.bsTchannel, 1, wx.EXPAND)
+        self.bsMain.Add(self.bsSide1, 1, wx.EXPAND)
+        if self.dewar == 'shiny':
+            self.bsMain.Add(self.bsSide2, 1, wx.EXPAND)
+
+        self.Bind(wx.EVT_CHOICE, self.onChoice, self.chTemp)
+
+        btnsizer = wx.StdDialogButtonSizer()
+
+        btn = wx.Button(self, wx.ID_OK)
+        btn.SetDefault()
+        btnsizer.AddButton(btn)
+
+        btn = wx.Button(self, wx.ID_CANCEL)
+        btnsizer.AddButton(btn)
+        btnsizer.Realize()
+
+        self.bsMain.Add(btnsizer, 0,
+                        wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        self.SetSizer(self.bsMain)
+        self.bsMain.Fit(self)
+        self.Show()
+
+    def make_dropdown(self, label):
+        lbl = wx.StaticText(self, wx.ID_ANY, label)
+        ch = wx.Choice(self, wx.ID_ANY, choices=self.registers)
+
+        bs = wx.BoxSizer(wx.HORIZONTAL)
+        bs.Add(lbl, 0, wx.EXPAND)
+        bs.Add(ch, 1, wx.EXPAND)
+
+        return bs, ch
+
+    def update_tchannel(self):
+        oldsel = self.chTchannel.GetSelection()
+        tsel = self.chTemp.GetSelection()
+        data = self.f.get_data(tsel)
+        nch = data.shape[-1]
+        newchoices = [str(i) for i in range(nch)]
+
+        self.chTchannel.Clear()
+        for choice in newchoices:
+            self.chTchannel.Append(choice)
+
+        if oldsel < nch:
+            self.chTchannel.SetSelection(oldsel)
+
+    def onChoice(self, event):
+        self.update_tchannel()

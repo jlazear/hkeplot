@@ -12,6 +12,7 @@ Example usage:
 """
 
 from HKEBinaryFile import HKEBinaryFile as BinaryFile
+from HKEBinaryFile import HKEInvalidRegisterError
 from scipy.interpolate import interp1d
 from numpy import *
 import os
@@ -68,16 +69,25 @@ class HKEModel(object):
 
     def loadfile(self, hkefname, calfname,
                  description='No description', dewar='SHINY',
-                 handleerrors=True):
+                 handleerrors=True, tregister=None, tchannel=None,
+                 r1register=None, r2register=None):
         dewar = dewar.lower()
         try:
             name = os.path.basename(hkefname)
             hkefile = BinaryFile(hkefname)
             if dewar in 'shiny':
-                toadd = self._SHINYload(hkefile, calfname)
+                toadd = self._SHINYload(hkefile, calfname,
+                                        tregister=tregister,
+                                        tchannel=tchannel,
+                                        r1register=r1register,
+                                        r2register=r2register)
                 toadd['dewar'] = 'shiny'
             elif dewar in 'craac':
-                toadd = self._CRAACload(hkefile, calfname)
+                toadd = self._CRAACload(hkefile, calfname,
+                                        tregister=tregister,
+                                        tchannel=tchannel,
+                                        r1register=r1register,
+                                        r2register=r2register)
                 toadd['dewar'] = 'craac'
             print "Successfully loaded file: {fname}".format(
                 fname=hkefname)
@@ -86,7 +96,7 @@ class HKEModel(object):
             if not handleerrors:
                 raise HKEPlotLoadError(hkefname, calfname)
             return
-        except KeyError:
+        except (KeyError, HKEInvalidRegisterError):
             # If the SHINY load fails, try the CRAAC load.
             print "SHINY load failed... Trying CRAAC load."
             name = os.path.basename(hkefname)
@@ -112,8 +122,18 @@ class HKEModel(object):
 
         return True
 
-    def _SHINYload(self, hkefile, calfname):
+    def _SHINYload(self, hkefile, calfname, tregister=None,
+                   tchannel=None, r1register=None, r2register=None):
         """Load a SHINY data file using the standard recipe."""
+        if tregister is None:
+            tregister = 'SHINY_T4 (5-TRead_Standard): Demod'
+        if tchannel is None:
+            tchannel = 0
+        if r1register is None:
+            r1register = 'SHINY_T3 (8-TRead_LR): Demod'
+        if r2register is None:
+            r2register = 'SHINY_T1 (4-TRead_LR): Demod'
+
         cal = self._cal_load(calfname)
         calTs, calRs = cal.T
         RofT = interp1d(calTs, calRs, bounds_error=False,
@@ -124,16 +144,21 @@ class HKEModel(object):
                         fill_value=-1.)
 
         # Thermometer data
-        dataT = hkefile.get_data('SHINY_T4 (5-TRead_Standard): Demod')
-        dataT = dataT[..., 0]
+        print "tregister = ", repr(tregister) #DELME
+        print (tregister in hkefile.list_registers()) #DELME
+        dataT = hkefile.get_data(tregister)
+        if 'DSPID' in tregister:
+            dataT = dataT.flatten()
+        else:
+            dataT = dataT[..., tchannel]
         Ts = TofR(dataT)
 
         # Side 1 resistances
-        dataR1 = hkefile.get_data('SHINY_T3 (8-TRead_LR): Demod')
+        dataR1 = hkefile.get_data(r1register)
         dataR1 = dataR1.T
 
         # Side 2 resistances
-        dataR2 = hkefile.get_data('SHINY_T1 (4-TRead_LR): Demod')
+        dataR2 = hkefile.get_data(r2register)
         dataR2 = dataR2.T
 
         # Transition temperatures (midpoint method)
@@ -141,12 +166,12 @@ class HKEModel(object):
         Tcs2 = array([self.find_mid_temp(rs, Ts) for rs in dataR2])
 
         # Excitation currents
-        IsT = hkefile.get_data('SHINY_T4 (5-TRead_Standard): ADac')[0]
+        IsT = hkefile.get_data(tregister[:-5] + 'ADac')[0]
 
-        Is1 = hkefile.get_data('SHINY_T3 (8-TRead_LR): ADac')
+        Is1 = hkefile.get_data(r1register[:-5] + 'ADac')
         Is1 = Is1.T
 
-        Is2 = hkefile.get_data('SHINY_T1 (4-TRead_LR): ADac')
+        Is2 = hkefile.get_data(r2register[:-5] + 'ADac')
         Is2 = Is2.T
 
         # Collect data into dictionary
@@ -165,8 +190,16 @@ class HKEModel(object):
 
         return retdict
 
-    def _CRAACload(self, hkefile, calfname):
+    def _CRAACload(self, hkefile, calfname, tregister=None,
+                   tchannel=0, r1register=None, r2register=None):
         """Load a CRAAC data file using the standard recipe."""
+        if tregister is None:
+            tregister = 'ADR Root coil (1-DSPID): Demod'
+        if tchannel is None:
+            tchannel = 0
+        if r1register is None:
+            r1register = '4W Quadrant (4-TRead_LR): Demod'
+
         # cal = loadtxt(calfname)
         cal = self._cal_load(calfname)
         calTs, calRs = cal.T
@@ -178,11 +211,14 @@ class HKEModel(object):
                         fill_value=-1.)
 
         # Thermometer Data
-        dataT = hkefile.get_data('ADR Root coil (1-DSPID): Demod').flatten()
+        if 'DSPID' in tregister:
+            dataT = hkefile.get_data(tregister).flatten()
+        else:
+            dataT = dataT[..., tchannel]
         Ts = TofR(dataT)
 
         # Side 1 resistances
-        dataR1 = hkefile.get_data('4W Quadrant (4-TRead_LR): Demod')
+        dataR1 = hkefile.get_data(r1register)
         dataR1 = dataR1.T
 
         # Transition temperatures (midpoint method)
@@ -262,6 +298,21 @@ class HKEModel(object):
             num = self.orderedkeys.index(name)
         self.datafiles[newname] = self.datafiles.pop(name)
         self.orderedkeys[num] = newname
+
+    def change_sources(self, name, treg, tch, s1reg, s2reg=None):
+        model = self[name]
+        f = model['file']
+        hkefname = f.filename
+        calfname = model['calfile']
+        desc = model['description']
+        dewar = model['dewar']
+
+        self.__delitem__(name)
+
+        self.loadfile(hkefname, calfname, description=desc,
+                      dewar=dewar, tregister=treg, tchannel=tch,
+                      r1register=s1reg, r2register=s2reg)
+        self.rename(-1, name)
 
     def add_descriptions(self, name, descriptions, side=1):
         """
