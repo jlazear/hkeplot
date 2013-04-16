@@ -17,9 +17,7 @@ class GraphFrame(wx.Frame):
     title = 'HKE Plot'
 
     def __init__(self):
-        styles = (wx.RESIZE_BORDER | wx.MINIMIZE_BOX)
-        # wx.Frame.__init__(self, wx.GetApp().TopWindow, wx.ID_ANY,
-        #                   title=self.title, style=styles)
+        styles = wx.DEFAULT_FRAME_STYLE & (~wx.CLOSE_BOX)
         wx.Frame.__init__(self, None, wx.ID_ANY,
                           title=self.title, style=styles)
 

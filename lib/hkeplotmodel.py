@@ -13,6 +13,7 @@ Example usage:
 
 from HKEBinaryFile import HKEBinaryFile as BinaryFile
 from HKEBinaryFile import HKEInvalidRegisterError
+from hkeconfig import HKEConfig
 from scipy.interpolate import interp1d
 from numpy import *
 import os
@@ -81,14 +82,12 @@ class HKEModel(object):
                                         tchannel=tchannel,
                                         r1register=r1register,
                                         r2register=r2register)
-                toadd['dewar'] = 'shiny'
             elif dewar in 'craac':
                 toadd = self._CRAACload(hkefile, calfname,
                                         tregister=tregister,
                                         tchannel=tchannel,
                                         r1register=r1register,
                                         r2register=r2register)
-                toadd['dewar'] = 'craac'
             print "Successfully loaded file: {fname}".format(
                 fname=hkefname)
         except IOError:
@@ -96,7 +95,7 @@ class HKEModel(object):
             if not handleerrors:
                 raise HKEPlotLoadError(hkefname, calfname)
             return
-        except (KeyError, HKEInvalidRegisterError):
+        except (KeyError, HKEInvalidRegisterError, IndexError):
             # If the SHINY load fails, try the CRAAC load.
             print "SHINY load failed... Trying CRAAC load."
             name = os.path.basename(hkefname)
@@ -125,14 +124,15 @@ class HKEModel(object):
     def _SHINYload(self, hkefile, calfname, tregister=None,
                    tchannel=None, r1register=None, r2register=None):
         """Load a SHINY data file using the standard recipe."""
+        registers = hkefile.list_registers()
         if tregister is None:
-            tregister = 'SHINY_T4 (5-TRead_Standard): Demod'
+            tregister = registers[57] # 'SHINY_T4 (5-TRead_Standard): Demod'
         if tchannel is None:
             tchannel = 0
         if r1register is None:
-            r1register = 'SHINY_T3 (8-TRead_LR): Demod'
+            r1register = registers[69] # 'SHINY_T3 (8-TRead_LR): Demod'
         if r2register is None:
-            r2register = 'SHINY_T1 (4-TRead_LR): Demod'
+            r2register = registers[53] # 'SHINY_T1 (4-TRead_LR): Demod'
 
         cal = self._cal_load(calfname)
         calTs, calRs = cal.T
@@ -144,8 +144,6 @@ class HKEModel(object):
                         fill_value=-1.)
 
         # Thermometer data
-        print "tregister = ", repr(tregister) #DELME
-        print (tregister in hkefile.list_registers()) #DELME
         dataT = hkefile.get_data(tregister)
         if 'DSPID' in tregister:
             dataT = dataT.flatten()
@@ -187,6 +185,11 @@ class HKEModel(object):
         retdict['Thermometer Excitation Current'] = IsT
         retdict['Side 1 Excitation Currents'] = Is1
         retdict['Side 2 Excitation Currents'] = Is2
+        retdict['Temperature Register'] = tregister
+        retdict['Temperature Channel'] = tchannel
+        retdict['Side 1 Register'] = r1register
+        retdict['Side 2 Register'] = r2register
+        retdict['dewar'] = 'shiny'
 
         return retdict
 
@@ -240,6 +243,10 @@ class HKEModel(object):
         retdict['Side 1 Transition Temperatures'] = Tcs1
         retdict['Thermometer Excitation Current'] = IsT
         retdict['Side 1 Excitation Currents'] = Is1
+        retdict['Temperature Register'] = tregister
+        retdict['Temperature Channel'] = tchannel
+        retdict['Side 1 Register'] = r1register
+        retdict['dewar'] = 'craac'
 
         return retdict
 

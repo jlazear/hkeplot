@@ -18,6 +18,7 @@ from lib.hkeplot import GraphApp
 # plotter.plot(xs, ys)
 
 app = GraphApp(0)
+#app = GraphApp(redirect='log.txt')
 fgf = app.fGraphFrame
 fmf = app.fMainFrame
 # fmf.add_model(model)

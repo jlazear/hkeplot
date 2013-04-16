@@ -5,6 +5,8 @@ import wx
 import wx.lib.filebrowsebutton as wxfbb
 import wx.lib.agw.ultimatelistctrl as ulc
 from hkeplotmodel import HKEPlotError
+from hkeconfig import HKEConfig
+from HKEBinaryLibrary import HKEBinaryError
 
 
 class ModelPanel(wx.Panel):
@@ -15,10 +17,12 @@ class ModelPanel(wx.Panel):
         wx.Panel.__init__(self, parent=parent, id=wx.ID_ANY)
 
         self.fmf = self.GetTopLevelParent()
+        self.config = self.fmf.config
 
         self.create_sizers()
         self.populate_bottom()
         self.populate_top()
+        self.preload_files()
 
     def create_sizers(self):
         """
@@ -75,11 +79,14 @@ class ModelPanel(wx.Panel):
 
         self.fbbFileBrowser = wxfbb.FileBrowseButton(self, -1,
             labelText='Data File')
-        self.fbbFileBrowser.SetValue('/Users/jlazear/Documents/HDD Documents/Python/hkeplot/hke_20130207_008.dat')
+        datafolder = self.config['hkeplot']['datafolder']
+        print "datafolder = ", datafolder #DELME
+        self.fbbFileBrowser.SetValue(datafolder)
 
         self.fbbCalFileBrowser = wxfbb.FileBrowseButton(self, -1,
             labelText='Cal File')
-        self.fbbCalFileBrowser.SetValue('/Users/jlazear/Documents/HDD Documents/Misc Data/Cal Curves/U03273.txt')
+        calfolder = self.config['hkeplot']['calfolder']
+        self.fbbCalFileBrowser.SetValue(calfolder)
 
         self.bLoad = wx.Button(self, -1, label='Load file')
 
@@ -99,7 +106,7 @@ class ModelPanel(wx.Panel):
         calfname = self.fbbCalFileBrowser.GetValue()
         try:
             model.loadfile(fname, calfname, handleerrors=False)
-        except HKEPlotError as e:
+        except (HKEPlotError, HKEBinaryError) as e:
             errtxt = str(e)
             dlg = wx.MessageDialog(self, errtxt,
                                    "Failed to load file",
@@ -116,8 +123,55 @@ class ModelPanel(wx.Panel):
         description = df['description']
         row = [name, fname2, dewar, description]
         self.lctrlData.Append(row)
+        HKEConfig.add_loaded_file(df, name=name)
 
         self.adjustColumnSizes()
+
+    def preload_files(self, configfname='.hkeplot'):
+        """
+        Load the files specified in the config file.
+        """
+        model = self.fmf.model
+        fdict = HKEConfig.get_loaded_files(configfname)
+
+        for fname, d in fdict.items():
+            propername = d['proper name']
+            absname = d['data file']
+            calname = d['cal file']
+            dewar = d['dewar']
+            desc = d['description']
+            tregister = d['temperature register']
+            tchannel = d['temperature channel']
+            s1register = d['side 1 register']
+            try:
+                s2register = d['side 2 register']
+            except KeyError:
+                s2register = None
+            try:
+                model.loadfile(absname, calname, description=desc,
+                               dewar=dewar, tregister=tregister,
+                               tchannel=tchannel,
+                               r1register=s1register,
+                               r2register=s2register)
+                model.rename(-1, propername)
+
+                # Update the listctrl with the newly added data file
+                name = model.keys()[-1]
+                df = model[name]
+                fname2 = df['filename']
+                dewar = df['dewar']
+                description = df['description']
+                row = [name, fname2, dewar, description]
+                self.lctrlData.Append(row)
+
+                self.adjustColumnSizes()
+            except (HKEPlotError, HKEBinaryError) as e:
+                errtxt = str(e)
+                dlg = wx.MessageDialog(self, errtxt,
+                                       "Failed to load file",
+                                       (wx.OK | wx.ICON_INFORMATION))
+                dlg.ShowModal()
+                dlg.Destroy()
 
     def adjustColumnSizes(self):
         """
@@ -166,6 +220,7 @@ class HKEListCtrl(ulc.UltimateListCtrl):
                       ulc.ULC_HAS_VARIABLE_ROW_HEIGHT))
 
         self.fmf = self.GetTopLevelParent()
+        self.parent = parent
 
         self.make_columns()
         self.make_context_menu()
@@ -217,9 +272,12 @@ class HKEListCtrl(ulc.UltimateListCtrl):
 
         try:
             model.rename(name, newname)
+            df = model[newname]
+            HKEConfig.remove_loaded_file(name=name)
+            HKEConfig.add_loaded_file(df, name=newname)
+            self.SetStringItem(selected, 0, newname)
         except ValueError:
             print "Item not found in model!"
-        self.SetStringItem(selected, 0, newname)
 
     def onChangeDesc(self, event):
         selected = self.GetFirstSelected()
@@ -242,9 +300,10 @@ class HKEListCtrl(ulc.UltimateListCtrl):
 
         try:
             df['description'] = newdescription
+            self.SetStringItem(selected, 3, newdescription)
+            HKEConfig.add_loaded_file(df, name=name)
         except NameError:
             print "Item not found in model!"
-        self.SetStringItem(selected, 3, newdescription)
 
     def onDelete(self, event):
         selected = self.GetFirstSelected()
@@ -254,6 +313,7 @@ class HKEListCtrl(ulc.UltimateListCtrl):
         try:
             del model[name]
             self.DeleteItem(selected)
+            HKEConfig.remove_loaded_file(name=name)
         except KeyError:
             pass
 
@@ -294,6 +354,8 @@ class HKEListCtrl(ulc.UltimateListCtrl):
 
             model.change_sources(name, treg=treg, tch=tch,
                                  s1reg=s1reg, s2reg=s2reg)
+            df = model[name]
+            HKEConfig.add_loaded_file(df)
 
         dlg.Destroy()
 
@@ -431,12 +493,21 @@ class RegistersDialog(wx.Dialog):
         elif self.dewar == 'shiny':
             self.bsSide2, self.chSide2 = self.make_dropdown('Side 2')
 
-            tdefault = self.registers.index(
-                'SHINY_T4 (5-TRead_Standard): Demod')
-            s1default = self.registers.index(
-                'SHINY_T3 (8-TRead_LR): Demod')
-            s2default = self.registers.index(
-                'SHINY_T1 (4-TRead_LR): Demod')
+            try:
+                tdefault = self.registers.index(
+                    'SHINY_T4 (5-TRead_Standard): Demod')
+            except ValueError:
+                tdefault = 0
+            try:
+                s1default = self.registers.index(
+                    'SHINY_T3 (8-TRead_LR): Demod')
+            except ValueError:
+                s1default = 0
+            try:
+                s2default = self.registers.index(
+                    'SHINY_T1 (4-TRead_LR): Demod')
+            except ValueError:
+                s2default = 0
             self.chTemp.SetSelection(tdefault)
             self.chSide1.SetSelection(s1default)
             self.chSide2.SetSelection(s2default)
@@ -450,8 +521,10 @@ class RegistersDialog(wx.Dialog):
 
         self.bsMain.Add(self.bsTemp, 1, wx.EXPAND)
         self.bsMain.Add(self.bsTchannel, 1, wx.EXPAND)
+        self.bsMain.Add((20, 20))
         self.bsMain.Add(self.bsSide1, 1, wx.EXPAND)
         if self.dewar == 'shiny':
+            self.bsMain.Add((20, 20))
             self.bsMain.Add(self.bsSide2, 1, wx.EXPAND)
 
         self.Bind(wx.EVT_CHOICE, self.onChoice, self.chTemp)

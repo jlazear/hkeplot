@@ -7,6 +7,7 @@ from modelpanel import ModelPanel
 from plotpanel import PlotPanel
 from hkeplotter import HKEPlotter as Plotter
 from hkeplotmodel import HKEModel as Model
+from hkeconfig import HKEConfig
 
 
 class NotebookFrame(wx.Notebook):
@@ -38,13 +39,15 @@ class MainFrame(wx.Frame):
     The main frame that holds all of the others. Really just an
     expandable container for the notebook.
     """
-    def __init__(self, graphframe=None, model=None, plotter=None):
+    def __init__(self, graphframe=None, model=None, plotter=None,
+                 configname='.hkeplot'):
         wx.Frame.__init__(self, None, wx.ID_ANY, "HKE Plotter",
                           size=(700, 500))
 
         self.model = model
         self.graphframe = graphframe
         self.plotter = plotter
+        self.config = HKEConfig(configname)
 
         self.make_menubar()
 
@@ -62,8 +65,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.onClose, self)
 
     def make_menubar(self):
-
-        ## WHY DOESN'T THIS WORK? ## #DELME
         self.menuBar = wx.MenuBar()
         self.menus = []
 
@@ -88,6 +89,8 @@ class MainFrame(wx.Frame):
         self.notebook.plotpanel.graphframe = graphframe
 
     def onClose(self, event):
+        # self.save_config()
+
         self.graphframe.Destroy()
         self.Destroy()
 
