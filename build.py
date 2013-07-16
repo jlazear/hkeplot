@@ -10,7 +10,7 @@ if sys.platform == 'win32':
     commands = [
     "git clone git://github.com/pyinstaller/pyinstaller.git ../pyinstaller",
     "mkdir build",
-    "python ../pyinstaller/utils/Makespec.py -F -w --specpath build -n hkeplot gui.py",
+    "python ../pyinstaller/utils/Makespec.py -F -w --out build -n hkeplot gui.py",
     "python ../pyinstaller/utils/Build.py build/hkeplot.spec",
     "copy build\dist\hkeplot.exe .\hkeplot.exe",
     "rmdir /Q /S build"]
