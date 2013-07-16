@@ -126,13 +126,16 @@ class HKEModel(object):
         """Load a SHINY data file using the standard recipe."""
         registers = hkefile.list_registers()
         if tregister is None:
-            tregister = registers[57] # 'SHINY_T4 (5-TRead_Standard): Demod'
+            # tregister = registers[57] # 'SHINY_T4 (5-TRead_Standard): Demod'
+            tregister = 'RuOx Thermometers (5-TRead_Standard): Demod'
         if tchannel is None:
             tchannel = 0
         if r1register is None:
-            r1register = registers[69] # 'SHINY_T3 (8-TRead_LR): Demod'
+            # r1register = registers[69] # 'SHINY_T3 (8-TRead_LR): Demod'
+            r1register = 'Sierra PCB Resistivity #2 (8-TRead_LR): Demod'
         if r2register is None:
-            r2register = registers[53] # 'SHINY_T1 (4-TRead_LR): Demod'
+            # r2register = registers[53] # 'SHINY_T1 (4-TRead_LR): Demod'
+            r2register = 'Sierra PCB Resistivity #2 (7-TRead_LR): Demod'
 
         cal = self._cal_load(calfname)
         calTs, calRs = cal.T
