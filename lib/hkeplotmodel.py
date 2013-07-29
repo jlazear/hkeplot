@@ -135,7 +135,8 @@ class HKEModel(object):
             r1register = 'Sierra PCB Resistivity #2 (8-TRead_LR): Demod'
         if r2register is None:
             # r2register = registers[53] # 'SHINY_T1 (4-TRead_LR): Demod'
-            r2register = 'Sierra PCB Resistivity #2 (7-TRead_LR): Demod'
+            # r2register = 'Sierra PCB Resistivity #2 (7-TRead_LR): Demod'
+            r2register = 'RuOx Thermometers (7-TRead_Standard): Demod'
 
         cal = self._cal_load(calfname)
         calTs, calRs = cal.T
