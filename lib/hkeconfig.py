@@ -6,8 +6,10 @@ class HKEConfig(object):
     datadfl = '/Users/jlazear/github/hkeplot/'
     caldfl = ('/Users/jlazear/Documents/HDD Documents/Misc Data/Cal'
               ' Curves/')
+    boardsdfl = ''
     configdefaults = {'hkeplot': {'datafolder': datadfl,
-                                  'calfolder': caldfl},
+                                  'calfolder': caldfl,
+                                  'boardsfolder': boardsdfl},
                       'loaded files': {}}
 
     def __new__(cls, filename='.hkeplot'):
@@ -131,22 +133,20 @@ class HKEConfig(object):
             pass
 
         calfname = filedict['calfile']
-        tregister = filedict['Temperature Register']
-        tchannel = filedict['Temperature Channel']
+        boardfname = filedict['boardsfile']
+        tdict = filedict['temperature']
+        taddress = tdict['address']
+        tchannel = tdict['channel']
         dewar = filedict['dewar']
         desc = filedict['description']
-        s1register = filedict['Side 1 Register']
-        config.set(sectionname, 'Temperature Register', tregister)
-        config.set(sectionname, 'Temperature Channel', tchannel)
-        config.set(sectionname, 'Side 1 Register', s1register)
-        if dewar == 'shiny':
-            s2register = filedict['Side 2 Register']
-            config.set(sectionname, 'Side 2 Register', s2register)
+        config.set(sectionname, 'temperature address', taddress)
+        config.set(sectionname, 'temperature channel', tchannel)
         config.set(sectionname, 'description', desc)
         config.set(sectionname, 'dewar', dewar)
-        config.set(sectionname, 'Data File', absname)
-        config.set(sectionname, 'Cal File', calfname)
-        config.set(sectionname, 'Proper Name', name)
+        config.set(sectionname, 'data file', absname)
+        config.set(sectionname, 'cal file', calfname)
+        config.set(sectionname, 'boards file', boardfname)
+        config.set(sectionname, 'proper name', name)
 
         with open(configfname, 'w+') as configfile:
             config.write(configfile)

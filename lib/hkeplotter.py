@@ -97,7 +97,9 @@ class HKEPlotter(object):
             raise HKEPlotterNotInitializedError(self.figure,
                                                 self.axes)
 
-    def RvsTPlot(self, datafile, dataRname, index, description='',
+    # def RvsTPlot(self, datafile, dataRname, index, description='',
+    #              Tcline=True):
+    def RvsTPlot(self, datafile, boardindex, chindex, description='',
                  Tcline=True):
         """
         Makes an R vs T plot from a specified datafile.
@@ -108,33 +110,64 @@ class HKEPlotter(object):
                                              self.axes) as e:
             print e
 
-        Ts = datafile['Temperatures']
-        dataR = datafile[dataRname]
-        Rs = dataR[index]
+        temperature = datafile['temperature']
+        Ts = temperature['Ts']
 
-        sidenum = dataRname.split()[1]
-        desclist = datafile['Side {s} Descriptions'.format(s=sidenum)]
-        chdesc = desclist[index]
+        board = datafile['boards'][boardindex]
+        register = board['registers'][chindex]
 
+        dataR = board['data']
+        Rs = dataR[chindex]
+
+        chdesc = register['name']
+        print "description = ", repr(description) #DELME
         if description:
             description = ' - ' + description
+        print "chdesc = ", repr(chdesc) #DELME
         if chdesc:
             description = description + ' - ' + chdesc
 
-        label = 'Ch {i}{d}'.format(i=index, d=description)
+        label = 'Ch {i}{d}'.format(i=chindex, d=description)
         line = self.plot(Ts, Rs, label=label)
 
         linedict = self._get_linedict(line)
         linedict['label'] = label
 
-        Tcs = datafile['Side {i} Transition Temperatures'.format(i=sidenum)]
-        Tc = Tcs[index]
+        Tc = board['Tcs'][chindex]
         linedict['Tc'] = Tc
 
         if Tcline:
             self.addTcline(line, Tc)
 
         return linedict
+
+        # Ts = datafile['Temperatures']
+        # dataR = datafile[dataRname]
+        # Rs = dataR[index]
+
+        # sidenum = dataRname.split()[1]
+        # desclist = datafile['Side {s} Descriptions'.format(s=sidenum)]
+        # chdesc = desclist[index]
+
+        # if description:
+        #     description = ' - ' + description
+        # if chdesc:
+        #     description = description + ' - ' + chdesc
+
+        # label = 'Ch {i}{d}'.format(i=index, d=description)
+        # line = self.plot(Ts, Rs, label=label)
+
+        # linedict = self._get_linedict(line)
+        # linedict['label'] = label
+
+        # Tcs = datafile['Side {i} Transition Temperatures'.format(i=sidenum)]
+        # Tc = Tcs[index]
+        # linedict['Tc'] = Tc
+
+        # if Tcline:
+        #     self.addTcline(line, Tc)
+
+        # return linedict
 
     def _get_linedict(self, line):
         """

@@ -29,6 +29,9 @@ class NotebookFrame(wx.Notebook):
         new = event.GetSelection()
         if new == 1:
             self.plotpanel.update_model()
+            self.plotpanel.SendSizeEvent()
+        else:
+            self.modelpanel.SendSizeEvent()
 
         # Necessary to actually cause page change
         event.Skip()
@@ -120,6 +123,8 @@ class GraphApp(wx.App):
         # has a tendency to create a frame of its own if none exists.
         self.plotter.makefigure()
         self.plotter.add_subplot(111)
+
+        self.fMainFrame.notebook.modelpanel.SendSizeEvent()
 
         return 1
 

@@ -14,10 +14,14 @@ Example usage:
 from HKEBinaryFile import HKEBinaryFile as BinaryFile
 from HKEBinaryFile import HKEInvalidRegisterError
 from hkeconfig import HKEConfig
+from parseboards import parse_boards_file, construct_register_name, \
+                        save_board_file
 from scipy.interpolate import interp1d
 from numpy import *
 import os
 from tempfile import TemporaryFile
+from collections import Iterable
+from types import StringTypes
 
 
 class HKEModel(object):
@@ -44,220 +48,116 @@ class HKEModel(object):
 
     will not work.
     """
-    def __init__(self, datafiles=None, calfiles=None, dewars=None):
+    def __init__(self, datafiles=None, calfiles=None, boardscfgfiles=None,
+                 taddresses=None, tchannels=None):
         self.datafiles = {}
         self.orderedkeys = []
 
-        if datafiles is not None:
-            if type(datafiles) not in (list, tuple, ndarray):
-                datafiles = [datafiles]
-            if calfiles is None:
-                print "No calibration file selected. No files loaded."
-                return
-            if type(dewars) not in (list, tuple, ndarray):
-                dewars = [dewars for i in datafiles]
-            elif type(calfiles) not in (list, tuple, ndarray):
-                calfiles = [calfiles for i in datafiles]
-            for i, f in enumerate(datafiles):
-                try:
-                    name = os.path.basename(f)
-                    calf = calfiles[i]
-                    toadd = self.loadfile(f, calf)
-                    self.datafiles[name] = toadd
-                except Exception as ex:
-                    print ex
-                    raise ex
-
-    def loadfile(self, hkefname, calfname,
-                 description='No description', dewar='SHINY',
-                 handleerrors=True, tregister=None, tchannel=None,
-                 r1register=None, r2register=None):
-        dewar = dewar.lower()
-        try:
-            name = os.path.basename(hkefname)
-            hkefile = BinaryFile(hkefname)
-            if dewar in 'shiny':
-                toadd = self._SHINYload(hkefile, calfname,
-                                        tregister=tregister,
-                                        tchannel=tchannel,
-                                        r1register=r1register,
-                                        r2register=r2register)
-            elif dewar in 'craac':
-                toadd = self._CRAACload(hkefile, calfname,
-                                        tregister=tregister,
-                                        tchannel=tchannel,
-                                        r1register=r1register,
-                                        r2register=r2register)
-            print "Successfully loaded file: {fname}".format(
-                fname=hkefname)
-        except IOError:
-            print "The file {fn} does not exist.".format(fn=hkefname)
-            if not handleerrors:
-                raise HKEPlotLoadError(hkefname, calfname)
+        if datafiles is None:
             return
-        except (KeyError, HKEInvalidRegisterError, IndexError):
-            # If the SHINY load fails, try the CRAAC load.
-            print "SHINY load failed... Trying CRAAC load."
-            name = os.path.basename(hkefname)
-            toadd = self._CRAACload(hkefile, calfname)
-            toadd['dewar'] = 'craac'
-            print "Successfully loaded file: {fname}".format(
-                fname=hkefname)
-        # except Exception as ex:
-        #     print ex
-        #     raise ex
 
-        toadd['filename'] = name
-        toadd['description'] = str(description)
+        if not isinstance(datafiles, StringTypes):
+            datafiles = [datafiles]
+        if calfiles is None:
+            print "No calibration file selected. No files loaded."
+            return
+        if not isinstance(boardscfgfiles, Iterable) or \
+            isinstance(boardscfgfiles, StringTypes):
+            boardscfgfiles = [boardscfgfiles for i in datafiles]
+        if not isinstance(taddresses, Iterable):
+            taddresses = [taddresses for i in datafiles]
+        if not isinstance(tchannels, Iterable):
+            tchannels = [tchannels for i in datafiles]
 
-        self.datafiles[name] = toadd
+        for i, f in enumerate(datafiles):
+            try:
+                name = os.path.basename(f)
+                bcfgf = boardscfgfiles[i]
+                calf = calfiles[i]
+                taddress = taddresses[i]
+                tchannel = tchannels[i]
+                toadd = self.loadfile(f, calf, bcfgf, taddress, tchannel)
+                self.datafiles[name] = toadd
+            except Exception as ex:
+                print ex
+                raise ex
+
+    def loadfile(self, hkefname, calfname, taddress=None, tchannel=None,
+                 bcfgfile=None, description=None, handleerrors=True):
+        hkefname = os.path.abspath(hkefname)
+        folder, name = os.path.split(hkefname)
+        fn, ext = os.path.splitext(hkefname)
+        newcfgname = fn + '_boards.txt'
+
+        calfname = os.path.abspath(calfname)
+
+        hkefile = BinaryFile(hkefname)
+        if bcfgfile is None:
+            bcfgfile = newcfgname
+        try:
+            boardsdict = parse_boards_file(bcfgfile)
+        except IOError:
+            raise HKEPlotLoadError(hkefname, calfname)
+
+        boards = boardsdict['boards']
+
+        # Load thermometer interpolation curves
+        cal = self._cal_load(calfname)
+        calTs, calRs = cal.T
+        RofT = interp1d(calTs, calRs, bounds_error=False,
+                        fill_value=-1.)
+        calRs = calRs[::-1]
+        calTs = calTs[::-1]
+        TofR = interp1d(calRs, calTs, bounds_error=False,
+                        fill_value=-1.)
+
+        # Load data from datafile
+        for addr in boards.keys():
+            t = boards[addr]['type']
+            if t not in ['pmaster']:
+                regname = construct_register_name(boards, addr)
+                boards[addr]['register_name'] = regname
+                data = hkefile.get_data(regname).T
+                boards[addr]['data'] = data
+
+        # Use first available data register as T, if none specified.
+        if taddress is None:
+            treg = boards.values()[0]
+            taddress = treg['address']
+            tchannel = 0
+        else:
+            treg = boards[taddress]
+        dataT = treg['data'][tchannel]
+
+        Ts = TofR(dataT)
+
+        # Compute TCs
+        for addr in boards.keys():
+            t = boards[addr]['type']
+            if t not in ['pmaster']:
+                data = boards[addr]['data']
+                Tcs = array([self.find_mid_temp(rs, Ts) for rs in data])
+                boards[addr]['Tcs'] = Tcs
+
+        boardsdict['filename'] = os.path.abspath(hkefname)
+        boardsdict['file'] = hkefile
+        boardsdict['calfile'] = calfname
+        boardsdict['boardsfile'] = newcfgname
+        if isinstance(description, StringTypes):
+            boardsdict['description'] = description
+
+        boardsdict['temperature'] = {'address': taddress,
+                                     'channel': tchannel,
+                                     'Ts': Ts}
+
+        # Save copy of the config file.
+        if not os.path.isfile(newcfgname):
+            save_board_file(boardsdict, newcfgname)
+
+        self.datafiles[name] = boardsdict
         self.orderedkeys.append(name)
 
-        if toadd['dewar'] is 'shiny':
-            self.add_descriptions(name, '', side=1)
-            self.add_descriptions(name, '', side=2)
-        elif toadd['dewar'] is 'craac':
-            self.add_descriptions(name, '', side=1)
-
         return True
-
-    def _SHINYload(self, hkefile, calfname, tregister=None,
-                   tchannel=None, r1register=None, r2register=None):
-        """Load a SHINY data file using the standard recipe."""
-        registers = hkefile.list_registers()
-        if tregister is None:
-            # tregister = registers[57]
-            # tregister = 'SHINY_T4 (5-TRead_Standard): Demod'
-            tregister = 'RuOx Thermometers (5-TRead_Standard): Demod'
-        if tchannel is None:
-            tchannel = 0
-        if r1register is None:
-            # r1register = registers[69]
-            # r1register = 'SHINY_T3 (8-TRead_LR): Demod'
-            # r1register = 'Sierra PCB Resistivity #2 (8-TRead_LR): Demod'
-            r1register = 'PIPER Detector Samples 1-7 (7-TRead_LR): Demod'
-        if r2register is None:
-            # r2register = registers[53]
-            # r2register = 'SHINY_T1 (4-TRead_LR): Demod'
-            # r2register = 'Sierra PCB Resistivity #2 (7-TRead_LR): Demod'
-            # r2register = 'RuOx Thermometers (7-TRead_Standard): Demod'
-            r2register = 'PIPER Detector Samples 8-13 (8-TRead_LR): Demod'
-
-        cal = self._cal_load(calfname)
-        calTs, calRs = cal.T
-        RofT = interp1d(calTs, calRs, bounds_error=False,
-                        fill_value=-1.)
-        calRs = calRs[::-1]
-        calTs = calTs[::-1]
-        TofR = interp1d(calRs, calTs, bounds_error=False,
-                        fill_value=-1.)
-
-        # Thermometer data
-        dataT = hkefile.get_data(tregister)
-        if 'DSPID' in tregister:
-            dataT = dataT.flatten()
-        else:
-            dataT = dataT[..., tchannel]
-        Ts = TofR(dataT)
-
-        # Side 1 resistances
-        dataR1 = hkefile.get_data(r1register)
-        dataR1 = dataR1.T
-
-        # Side 2 resistances
-        dataR2 = hkefile.get_data(r2register)
-        dataR2 = dataR2.T
-
-        # Transition temperatures (midpoint method)
-        Tcs1 = array([self.find_mid_temp(rs, Ts) for rs in dataR1])
-        Tcs2 = array([self.find_mid_temp(rs, Ts) for rs in dataR2])
-
-        # Excitation currents
-        IsT = hkefile.get_data(tregister[:-5] + 'ADac')[0]
-
-        Is1 = hkefile.get_data(r1register[:-5] + 'ADac')
-        Is1 = Is1.T
-
-        Is2 = hkefile.get_data(r2register[:-5] + 'ADac')
-        Is2 = Is2.T
-
-        # Collect data into dictionary
-        retdict = {}
-
-        retdict['file'] = hkefile
-        retdict['calfile'] = calfname
-        retdict['Temperatures'] = Ts
-        retdict['Side 1 Resistances'] = dataR1
-        retdict['Side 2 Resistances'] = dataR2
-        retdict['Side 1 Transition Temperatures'] = Tcs1
-        retdict['Side 2 Transition Temperatures'] = Tcs2
-        retdict['Thermometer Excitation Current'] = IsT
-        retdict['Side 1 Excitation Currents'] = Is1
-        retdict['Side 2 Excitation Currents'] = Is2
-        retdict['Temperature Register'] = tregister
-        retdict['Temperature Channel'] = tchannel
-        retdict['Side 1 Register'] = r1register
-        retdict['Side 2 Register'] = r2register
-        retdict['dewar'] = 'shiny'
-
-        return retdict
-
-    def _CRAACload(self, hkefile, calfname, tregister=None,
-                   tchannel=0, r1register=None, r2register=None):
-        """Load a CRAAC data file using the standard recipe."""
-        if tregister is None:
-            tregister = 'ADR Root coil (1-DSPID): Demod'
-        if tchannel is None:
-            tchannel = 0
-        if r1register is None:
-            r1register = '4W Quadrant (4-TRead_LR): Demod'
-
-        # cal = loadtxt(calfname)
-        cal = self._cal_load(calfname)
-        calTs, calRs = cal.T
-        RofT = interp1d(calTs, calRs, bounds_error=False,
-                        fill_value=-1.)
-        calRs = calRs[::-1]
-        calTs = calTs[::-1]
-        TofR = interp1d(calRs, calTs, bounds_error=False,
-                        fill_value=-1.)
-
-        # Thermometer Data
-        if 'DSPID' in tregister:
-            dataT = hkefile.get_data(tregister).flatten()
-        else:
-            dataT = dataT[..., tchannel]
-        Ts = TofR(dataT)
-
-        # Side 1 resistances
-        dataR1 = hkefile.get_data(r1register)
-        dataR1 = dataR1.T
-
-        # Transition temperatures (midpoint method)
-        Tcs1 = array([self.find_mid_temp(rs, Ts) for rs in dataR1])
-
-        # Excitation currents
-        IsT = hkefile.get_data('ADR Root coil (1-DSPID): ADac')[0]
-
-        Is1 = hkefile.get_data('4W Quadrant (4-TRead_LR): ADac')
-        Is1 = Is1.T
-
-        # Collect data into dictionary
-        retdict = {}
-
-        retdict['file'] = hkefile
-        retdict['calfile'] = calfname
-        retdict['Temperatures'] = Ts
-        retdict['Side 1 Resistances'] = dataR1
-        retdict['Side 1 Transition Temperatures'] = Tcs1
-        retdict['Thermometer Excitation Current'] = IsT
-        retdict['Side 1 Excitation Currents'] = Is1
-        retdict['Temperature Register'] = tregister
-        retdict['Temperature Channel'] = tchannel
-        retdict['Side 1 Register'] = r1register
-        retdict['dewar'] = 'craac'
-
-        return retdict
 
     ########################################
     ########## Utility Functions ###########

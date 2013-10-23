@@ -327,36 +327,42 @@ class PlotPanel(wx.Panel):
         model = self.fmf.model
         name = event.GetString()
         df = model[name]
-        dewar = df['dewar']
-        if dewar == 'shiny':
-            allowed = ['Side 1 Resistances',
-                       'Side 2 Resistances',
-                       'Side 1 Excitation Currents',
-                       'Side 2 Excitation Currents']
-                       # 'Thermometer Excitation Current']
-        elif dewar == 'craac':
-            allowed = ['Side 1 Resistances',
-                       'Side 1 Excitation Currents']
-                       # 'Thermometer Excitation Current']
+
+        # Exclude PMaster (addr = 255)
+        addresses = [addr for addr in df['boards'].keys() if addr != 255]
+
+        bstr = "{addr} - {name} ({type})"
+        items = []
+        for addr in addresses:
+            board = df['boards'][addr]
+            name = board['name']
+            t = board['type'].upper()
+            itemstr = bstr.format(name=name, type=t, addr=addr)
+            items.append(itemstr)
+
         self.clear_listbox(self.lboxKey)
-        self.lboxKey.InsertItems(allowed, 0)
+        self.lboxKey.InsertItems(items, 0)
+        self.SendSizeEvent()
 
     def onKeySelect(self, event):
         model = self.fmf.model
-        register = event.GetString()
-        name = self.lboxFile.GetStringSelection()
+        boardname = event.GetString()
+        filename = self.lboxFile.GetStringSelection()
+        df = model[filename]
+
+        addr = int(boardname.split(' - ')[0])
+        board = df['boards'][addr]
+        regstr = "{ch} - {name} ({type})"
+        chs = []
+        for ch, reg in board['registers'].items():
+            t = reg['type']
+            n = reg['name']
+            chstr = regstr.format(ch=ch, name=n, type=t)
+            chs.append(chstr)
 
         self.clear_listbox(self.lboxIndices)
-
-        if register == 'Thermometer Excitation Current':
-            self.lboxIndices.InsertItems(['Thermometer'], 0)
-            return
-
-        side = register.split()[1]
-        ds = model[name]['Side {s} Descriptions'.format(s=side)]
-        ds = ['Ch {i} - {d}'.format(i=i, d=d)
-              for i, d in enumerate(ds)]
-        self.lboxIndices.InsertItems(ds, 0)
+        self.lboxIndices.InsertItems(chs, 0)
+        self.SendSizeEvent()
 
     def onIndicesSelect(self, event):
         pass
@@ -367,61 +373,114 @@ class PlotPanel(wx.Panel):
         """
         # Get info about the model
         model = self.fmf.model
-        name = self.lboxFile.GetStringSelection()
-        register = self.lboxKey.GetStringSelection()
-        df = model[name]
-        dewar = df['dewar']
-        filedesc = df['description']
-        if filedesc == 'No description':
-            filedesc = ''
+        filename = self.lboxFile.GetStringSelection()
+        boardname = self.lboxKey.GetStringSelection()
+        chindices = self.lboxIndices.GetSelections()
+        chnames = [self.lboxIndices.GetString(i) for i in chindices]
+        # chnames = self.lboxIndices.GetStringSelections()
 
-        try:
-            side = register.split()[1]
-            descriptions = df['Side {i} Descriptions'.format(i=side)]
-        except KeyError:
-            descriptions = ['Thermometer']
-        except IndexError:
-            return
+        addr = int(boardname.split(' - ', 1)[0])
+        chs = [int(chname.split(' - ', 1)[0]) for chname in chnames]
+
+        df = model[filename]
+        board = df['boards'][addr]
+        registers = [board['registers'][ch] for ch in chs]
+
+        btype = board['type'].upper()
+        dewar = str(df['dewar'])
+        filedesc = df['description']
+        if (filedesc in ['No description', 'None']) or (filedesc is None):
+            filedesc = ''
 
         # Set figure parameters (e.g. axis labels)
         xlabel = 'Temperature (K)'
         self.plotter.xlabel(xlabel)
         self.txtXlabel.ChangeValue(xlabel)
-        if 'Resistances' in register:
-            ylabel = 'Resistance ($\Omega$)'
-            self.plotter.ylabel(ylabel)
-            self.txtYlabel.ChangeValue(ylabel)
-        elif 'Currents' in register:
-            ylabel = 'Excitation Current (nA)'
-            self.plotter.ylabel(ylabel)
-            self.txtYlabel.ChangeValue(ylabel)
+        ylabel = 'Resistance ($\Omega$)'
+        self.plotter.ylabel(ylabel)
+        self.txtYlabel.ChangeValue(ylabel)
 
         # Get and plot selection
-        indices = self.lboxIndices.GetSelections()
         tcflag = self.cbTcs.GetValue()
-
-        for i in indices:
-            i = int(i)
-            d = descriptions[i]
-            linedict = self.plotter.RvsTPlot(df, register, i,
-                                             Tcline=tcflag,
-                                             description=filedesc)
-
+        for j, reg in enumerate(registers):
+            i = reg['channel']
+            desc = reg['name']
+            linedict = self.plotter.RvsTPlot(df, addr, i,
+                                             description=filedesc,
+                                             Tcline=tcflag)
             description = ''
             if filedesc:
                 description = ' - ' + filedesc
-            if d:
-                description = description + ' - ' + d
+            if desc:
+                description = description + ' - ' + desc
 
-            # n = self.lctrlLines.GetItemCount()
-            row = [register, name, dewar,
+            regname = chnames[j]
+            row = [boardname, filename, dewar,
                    'Ch {i}{d}'.format(i=i, d=description)]
             self.lctrlLines.Append(row)
             self.lctrlLines.linelist.append(linedict)
+
         self.lctrlLines.adjustColumnSizes()
 
         self.update_legend()
         self.update_figure()
+
+
+
+
+
+        # dewar = df['dewar']
+        # filedesc = df['description']
+        # if filedesc == 'No description':
+        #     filedesc = ''
+
+        # try:
+        #     side = register.split()[1]
+        #     descriptions = df['Side {i} Descriptions'.format(i=side)]
+        # except KeyError:
+        #     descriptions = ['Thermometer']
+        # except IndexError:
+        #     return
+
+        # # Set figure parameters (e.g. axis labels)
+        # xlabel = 'Temperature (K)'
+        # self.plotter.xlabel(xlabel)
+        # self.txtXlabel.ChangeValue(xlabel)
+        # if 'Resistances' in register:
+        #     ylabel = 'Resistance ($\Omega$)'
+        #     self.plotter.ylabel(ylabel)
+        #     self.txtYlabel.ChangeValue(ylabel)
+        # elif 'Currents' in register:
+        #     ylabel = 'Excitation Current (nA)'
+        #     self.plotter.ylabel(ylabel)
+        #     self.txtYlabel.ChangeValue(ylabel)
+
+        # # Get and plot selection
+        # indices = self.lboxIndices.GetSelections()
+        # tcflag = self.cbTcs.GetValue()
+
+        # for i in indices:
+        #     i = int(i)
+        #     d = descriptions[i]
+        #     linedict = self.plotter.RvsTPlot(df, register, i,
+        #                                      Tcline=tcflag,
+        #                                      description=filedesc)
+
+        #     description = ''
+        #     if filedesc:
+        #         description = ' - ' + filedesc
+        #     if d:
+        #         description = description + ' - ' + d
+
+        #     # n = self.lctrlLines.GetItemCount()
+        #     row = [register, name, dewar,
+        #            'Ch {i}{d}'.format(i=i, d=description)]
+        #     self.lctrlLines.Append(row)
+        #     self.lctrlLines.linelist.append(linedict)
+        # self.lctrlLines.adjustColumnSizes()
+
+        # self.update_legend()
+        # self.update_figure()
 
     def onKeyUpFile(self, event):
         # Not functioning for some reason...

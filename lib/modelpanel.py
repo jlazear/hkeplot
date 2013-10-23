@@ -48,11 +48,11 @@ class ModelPanel(wx.Panel):
         self.lctrlData = HKEListCtrl(self)
 
         self.bsControls = wx.BoxSizer(wx.VERTICAL)
-        self.bList = wx.Button(self, label='List')
+        # self.bList = wx.Button(self, label='List')
         self.bRename = wx.Button(self, label='Rename')
         self.bChange = wx.Button(self, label='Desc')
         self.bDelete = wx.Button(self, label='Delete')
-        self.bsControls.Add(self.bList, 1, wx.EXPAND)
+        # self.bsControls.Add(self.bList, 1, wx.EXPAND)
         self.bsControls.Add(self.bRename, 1, wx.EXPAND)
         self.bsControls.Add(self.bChange, 1, wx.EXPAND)
         self.bsControls.Add(self.bDelete, 1, wx.EXPAND)
@@ -60,7 +60,7 @@ class ModelPanel(wx.Panel):
         sizer.Add(self.lctrlData, 1, wx.EXPAND)
         sizer.Add(self.bsControls, 0)
 
-        self.Bind(wx.EVT_BUTTON, self.lctrlData.onListChs, self.bList)
+        # self.Bind(wx.EVT_BUTTON, self.lctrlData.onListChs, self.bList)
         self.Bind(wx.EVT_BUTTON, self.lctrlData.onRename,
                   self.bRename)
         self.Bind(wx.EVT_BUTTON, self.lctrlData.onChangeDesc,
@@ -88,24 +88,49 @@ class ModelPanel(wx.Panel):
         calfolder = self.config['hkeplot']['calfolder']
         self.fbbCalFileBrowser.SetValue(calfolder)
 
+        self.bsBoards = wx.BoxSizer(wx.HORIZONTAL)
+        self.bsBoardsButtons = wx.BoxSizer(wx.VERTICAL)
+        self.lblOverwrite = wx.StaticText(self, -1,
+                                          label='Use stored if available')
+        self.chkOverwrite = wx.CheckBox(self, -1)
+        self.chkOverwrite.SetValue(True)
+        self.bsBoardsButtons.Add(self.lblOverwrite, 0, wx.ALIGN_CENTER)
+        self.bsBoardsButtons.Add(self.chkOverwrite, 0, wx.ALIGN_CENTER)
+
+        self.fbbBoardFileBrowser = wxfbb.FileBrowseButton(self, -1,
+            labelText='Boards File')
+        boardsfolder = self.config['hkeplot']['boardsfolder']
+        self.fbbBoardFileBrowser.SetValue(boardsfolder)
+        self.bsBoards.Add(self.bsBoardsButtons, 0, wx.EXPAND | wx.RIGHT)
+        self.bsBoards.Add(self.fbbBoardFileBrowser, 1, wx.EXPAND | wx.LEFT)
+
         self.bLoad = wx.Button(self, -1, label='Load file')
 
         self.bsLoad.Add(self.fbbFileBrowser, 1, wx.EXPAND | wx.BOTTOM)
         self.bsLoad.Add(self.fbbCalFileBrowser, 1,
                         wx.EXPAND | wx.BOTTOM)
+        self.bsLoad.Add(self.bsBoards, 1, wx.EXPAND | wx.BOTTOM)
         self.bsLoad.Add(self.bLoad, 1, wx.EXPAND | wx.TOP)
 
         sizer.Add(self.bsLoad, 1, wx.EXPAND)
 
         self.Bind(wx.EVT_BUTTON, self.onLoadButton, self.bLoad)
+        self.Bind(wx.EVT_CHECKBOX, self.onOverwriteCheckBox,
+                  self.chkOverwrite)
 
     def onLoadButton(self, event):
         # Load the specified file into the model
         model = self.fmf.model
         fname = self.fbbFileBrowser.GetValue()
         calfname = self.fbbCalFileBrowser.GetValue()
+        overwrite = self.chkOverwrite.IsChecked()
+        if overwrite:
+            boardfname = self.fbbBoardFileBrowser.GetValue()
+        else:
+            boardfname = None
         try:
-            model.loadfile(fname, calfname, handleerrors=False)
+            model.loadfile(fname, calfname, bcfgfile=boardfname,
+                           handleerrors=False)
         except (HKEPlotError, HKEBinaryError) as e:
             errtxt = str(e)
             dlg = wx.MessageDialog(self, errtxt,
@@ -127,6 +152,21 @@ class ModelPanel(wx.Panel):
 
         self.adjustColumnSizes()
 
+    def onOverwriteCheckBox(self, event):
+        """
+        Warn the user that will overwrite and destroy old boards.txt
+        config file if present.
+        """
+        if not event.IsChecked():
+            msg = ("WARNING: If a data file with a pre-existing boards.txt"
+                   " file is loaded, the stored boards.txt file will be "
+                   "overwritten and destroyed! Make sure you REALLY want to"
+                   " overwrite the stored file!")
+            dlg = wx.MessageDialog(self, msg, 'WARNING!', wx.OK)
+            dlg.ShowModal()
+            dlg.Destroy()
+
+
     def preload_files(self, configfname='.hkeplot'):
         """
         Load the files specified in the config file.
@@ -140,19 +180,11 @@ class ModelPanel(wx.Panel):
             calname = d['cal file']
             dewar = d['dewar']
             desc = d['description']
-            tregister = d['temperature register']
-            tchannel = d['temperature channel']
-            s1register = d['side 1 register']
-            try:
-                s2register = d['side 2 register']
-            except KeyError:
-                s2register = None
+            taddress = int(d['temperature address'])
+            tchannel = int(d['temperature channel'])
             try:
                 model.loadfile(absname, calname, description=desc,
-                               dewar=dewar, tregister=tregister,
-                               tchannel=tchannel,
-                               r1register=s1register,
-                               r2register=s2register)
+                               taddress=taddress, tchannel=tchannel)
                 model.rename(-1, propername)
 
                 # Update the listctrl with the newly added data file
@@ -249,7 +281,7 @@ class HKEListCtrl(ulc.UltimateListCtrl):
         self.Bind(wx.EVT_MENU, self.onRename, self.miRename)
         self.Bind(wx.EVT_MENU, self.onChangeDesc, self.miChangeDesc)
         self.Bind(wx.EVT_MENU, self.onDelete, self.miDelete)
-        self.Bind(wx.EVT_MENU, self.onListChs, self.miListChs)
+        # self.Bind(wx.EVT_MENU, self.onListChs, self.miListChs)
         self.Bind(wx.EVT_MENU, self.onChangeReg,
                   self.miChangeRegisters)
 
@@ -317,23 +349,24 @@ class HKEListCtrl(ulc.UltimateListCtrl):
         except KeyError:
             pass
 
-    def onListChs(self, event):
-        selected = self.GetFirstSelected()
-        name = self.GetItem(selected, 0).GetText()
-        model = self.fmf.model
+    #DELME: NEEDS TO BE UPDATED TO NEW METADATA FORMAT!
+    # def onListChs(self, event):
+    #     selected = self.GetFirstSelected()
+    #     name = self.GetItem(selected, 0).GetText()
+    #     model = self.fmf.model
 
-        dlg = ChannelsDialog(self, wx.ID_ANY, name, model,
-                             title="Channels List")
+    #     dlg = ChannelsDialog(self, wx.ID_ANY, name, model,
+    #                          title="Channels List")
 
-        dlg.CenterOnScreen()
-        val = dlg.ShowModal()
+    #     dlg.CenterOnScreen()
+    #     val = dlg.ShowModal()
 
-        if val == wx.ID_OK:
-            for i, txtlist in enumerate(dlg.txtlists):
-                ds = [txt.GetLineText(0) for txt in txtlist]
-                model.add_descriptions(name, ds, i+1)
+    #     if val == wx.ID_OK:
+    #         for i, txtlist in enumerate(dlg.txtlists):
+    #             ds = [txt.GetLineText(0) for txt in txtlist]
+    #             model.add_descriptions(name, ds, i+1)
 
-        dlg.Destroy()
+    #     dlg.Destroy()
 
     def onChangeReg(self, event):
         selected = self.GetFirstSelected()
