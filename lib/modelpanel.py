@@ -1,6 +1,7 @@
 """
 The Model Panel for the HKE Plotter program's main panel.
 """
+import os
 import wx
 import wx.lib.filebrowsebutton as wxfbb
 import wx.lib.agw.ultimatelistctrl as ulc
@@ -122,7 +123,19 @@ class ModelPanel(wx.Panel):
         # Load the specified file into the model
         model = self.fmf.model
         fname = self.fbbFileBrowser.GetValue()
+
         calfname = self.fbbCalFileBrowser.GetValue()
+        if not (os.path.isfile(fname) and os.path.isfile(calfname)):
+            errtxt = ('Data file ({0}) or Cal file ({1}) does not exist! '
+                      'File not loaded!')
+            errtxt = errtxt.format(fname, calfname)
+            dlg = wx.MessageDialog(self, errtxt,
+                                   "Failed to load file",
+                                   (wx.OK | wx.ICON_INFORMATION))
+            dlg.ShowModal()
+            dlg.Destroy()
+            return
+
         overwrite = self.chkOverwrite.IsChecked()
         if overwrite:
             boardfname = self.fbbBoardFileBrowser.GetValue()
@@ -131,7 +144,7 @@ class ModelPanel(wx.Panel):
         try:
             model.loadfile(fname, calfname, bcfgfile=boardfname,
                            handleerrors=False)
-        except (HKEPlotError, HKEBinaryError) as e:
+        except (HKEPlotError, HKEBinaryError, IOError) as e:
             errtxt = str(e)
             dlg = wx.MessageDialog(self, errtxt,
                                    "Failed to load file",
@@ -183,8 +196,8 @@ class ModelPanel(wx.Panel):
             taddress = int(d['temperature address'])
             tchannel = int(d['temperature channel'])
             try:
-                model.loadfile(absname, calname, description=desc,
-                               taddress=taddress, tchannel=tchannel)
+                model.loadfile(absname, calname, description=desc)#, #DELME?
+                               # taddress=taddress, tchannel=tchannel)
                 model.rename(-1, propername)
 
                 # Update the listctrl with the newly added data file

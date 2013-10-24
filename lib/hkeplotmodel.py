@@ -82,7 +82,7 @@ class HKEModel(object):
                 print ex
                 raise ex
 
-    def loadfile(self, hkefname, calfname, taddress=None, tchannel=None,
+    def loadfile(self, hkefname, calfname, #taddress=None, tchannel=None,
                  bcfgfile=None, description=None, handleerrors=True):
         hkefname = os.path.abspath(hkefname)
         folder, name = os.path.split(hkefname)
@@ -121,12 +121,21 @@ class HKEModel(object):
                 boards[addr]['data'] = data
 
         # Use first available data register as T, if none specified.
+        # if taddress is None:
+        #     print "toaddress is None!" #DELME
+        #     treg = boards.values()[0]
+        #     taddress = treg['address']
+        #     tchannel = 0
+        # else:
+        #     treg = boards[taddress]
+        taddress = boardsdict['temperature']['address']
+        tchannel = boardsdict['temperature']['channel']
         if taddress is None:
             treg = boards.values()[0]
-            taddress = treg['address']
-            tchannel = 0
         else:
             treg = boards[taddress]
+        if tchannel is None:
+            tchannel = 0
         dataT = treg['data'][tchannel]
 
         Ts = TofR(dataT)
@@ -148,7 +157,9 @@ class HKEModel(object):
 
         boardsdict['temperature'] = {'address': taddress,
                                      'channel': tchannel,
-                                     'Ts': Ts}
+                                     'Ts': Ts,
+                                     'TofR': TofR,
+                                     'RofT': RofT}
 
         # Save copy of the config file.
         if not os.path.isfile(newcfgname):
